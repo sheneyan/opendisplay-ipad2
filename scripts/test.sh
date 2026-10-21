@@ -20,3 +20,5 @@ xcrun clang -Wall -Wextra -Werror -Wno-unused-parameter -fobjc-arc -fblocks \
   -fsanitize=address,undefined -I"$ROOT/app" "$ROOT/tests/touch_input_tests.m" \
   "$ROOT/app/ODTouchInput.m" -framework Foundation -o "$ROOT/build/tests/touch_input_tests"
 "$ROOT/build/tests/touch_input_tests"
+
+python3 "$ROOT/tests/launcher_tests.py"
