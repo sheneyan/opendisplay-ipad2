@@ -15,8 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('profile', type=Path)
 parser.add_argument('--udid', required=True)
+parser.add_argument('--app', type=Path, default=ROOT / 'build/LegacyDisplay.app',
+                    help='App bundle to sign; IPA is written beside it')
 args = parser.parse_args()
-app = ROOT / 'build/LegacyDisplay.app'
+app = args.app.resolve()
 info = plistlib.loads((app / 'Info.plist').read_bytes())
 bundle = info['CFBundleIdentifier']
 raw = subprocess.check_output(['security', 'cms', '-D', '-i', str(args.profile)])
@@ -47,7 +49,7 @@ shutil.copyfile(args.profile, app / 'embedded.mobileprovision')
 subprocess.run(['codesign', '--force', '--sign', identity, '--digest-algorithm=sha1,sha256',
                 '--entitlements', str(entitlement_path), str(app)], check=True)
 subprocess.run(['codesign', '--verify', '--strict', '--verbose=2', str(app)], check=True)
-ipa = ROOT / 'build/LegacyDisplay.ipa'
+ipa = app.with_suffix('.ipa')
 with zipfile.ZipFile(ipa, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in app.rglob('*'):
         if path.is_file():

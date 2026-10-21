@@ -28,6 +28,16 @@ The user approved trying 1280x960 logical desktop space with unchanged 1024x768 
 
 The diagnostics label is hidden; desktop sizing and video limits are unchanged. Build 5 passed compilation, armv7/iOS metadata checks and signature verification, then installed and launched on the iPad. A fresh USB screenshot confirmed the received desktop has no bottom diagnostics overlay. GitHub About now describes the native iOS 9 / armv7 USB receiver, no-jailbreak operation and MIT license in English, with relevant repository topics.
 
+## iPad mini 2 installation and public guide
+
+The second USB device was identified directly as `iPad4,4`, iOS 12.5.8 (16H88), arm64: an iPad mini 2 Wi-Fi. Its OS cannot launch the existing 32-bit package. `scripts/build-arm64.sh` builds the unchanged receiver source with Xcode's current iPhoneOS SDK and an iOS 12.0 deployment target, into `build/arm64/`. The accepted armv7 Build 5 package and installed iPad 2 app remain intact. `sign.py --app` selects the bundle and writes its IPA beside it.
+
+Pairing required the user to accept Trust on the mini. The device accepted the Apple-signed 12.4 (16G73) developer disk image. Xcode initially excluded the device because the provisioning helper declared armv7; command-line architecture overrides alone did not resolve destination filtering. `provision.sh` now generates an ignored helper spec for `BUILD_ARCH=armv7` (default) or `arm64` before invoking Xcode. The arm64 route successfully registered/provisioned this mini using the existing account.
+
+The arm64 Build 5 package passed signing verification, installation and launch, then connected to the unmodified OpenDisplay 1.19.0 sender. Host logs confirmed a 1280x960 logical desktop and 1024x768 H.264 capture. Host display enumeration showed four online, unmirrored displays: the Mac internal panel, physical external monitor, iPad 2 and mini 2. A temporary copy of the smoke tool targeted the mini's exact display ID; two USB screenshots confirmed the test text, color blocks and advancing counter without a diagnostics strip. No physical FPS, latency, full Retina stream or long-duration stability claim is made.
+
+The English README now walks through sender setup, architecture selection, tools, SDKs, device trust, provisioning, signing, installation, daily use, reconnects, expiration and troubleshooting. Only the two device/OS combinations above are hardware-verified. Raw mini screenshots and diagnostics remain under ignored `build/evidence/` and `.private/`.
+
 ## Build environment
 
 - Xcode 26.6 clang and `ld-classic`, invoked directly because modern Xcode's build system rejects armv7.
@@ -42,7 +52,7 @@ The diagnostics label is hidden; desktop sizing and video limits are unchanged. 
 - OpenDisplay 1.19.0 ignores the receiver's advertised 30 fps ceiling. Submitted-frame counters are not physical display FPS measurements.
 - After exiting the receiver, manually click Connect in the sender if necessary. Automatic app-exit reconnect is not claimed.
 - Actual cable unplug/replug, thermal behavior, extended daily use, physical end-to-end latency and other iPad models are unverified.
-- Source compiles and runs on the tested setup; this is not a claim that all Xcode versions retain an armv7-capable linker.
+- Source compiles and runs on the tested setup; this is not a claim that all Xcode versions retain an armv7-capable linker. The arm64 route uses the current Xcode SDK and a separate output directory.
 
 ## Next work, only if requested
 

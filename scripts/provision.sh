@@ -3,15 +3,33 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${DEVELOPMENT_TEAM:?Set DEVELOPMENT_TEAM to your existing Apple development team ID}"
 : "${DEVICE_UDID:?Set DEVICE_UDID to the attached iPad identifier from idevice_id -l}"
+BUILD_ARCH="${BUILD_ARCH:-armv7}"
+case "$BUILD_ARCH" in
+  armv7) MIN_IOS=9.0 ;;
+  arm64) MIN_IOS=12.0 ;;
+  *) echo 'BUILD_ARCH must be armv7 or arm64' >&2; exit 1 ;;
+esac
 mkdir -p "$ROOT/.private"
 chmod 700 "$ROOT/.private"
 cd "$ROOT"
-xcodegen generate
+# Xcode filters device destinations using the generated project's architecture
+# before applying command-line build overrides. Generate the matching helper.
+python3 - "$BUILD_ARCH" "$MIN_IOS" <<'PY'
+from pathlib import Path
+import sys
+text = Path('project.yml').read_text()
+text = text.replace('ARCHS: armv7', 'ARCHS: ' + sys.argv[1])
+text = text.replace("iOS: '9.0'", "iOS: '" + sys.argv[2] + "'")
+Path('.private/provision-project.yml').write_text(text)
+PY
+xcodegen generate --spec .private/provision-project.yml --project-root "$ROOT" --project "$ROOT"
 # This modern-Xcode project is used for portal registration/provisioning only.
-# Xcode's subsequent armv7 rejection is expected; build.sh builds the real app.
+# Use the selected build script's output for installation; armv7 build rejection
+# after successful provisioning is expected with modern Xcode.
 xcodebuild -project LegacyDisplay.xcodeproj -scheme LegacyDisplay \
   -destination "id=$DEVICE_UDID" -derivedDataPath build/xcode \
   DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" -allowProvisioningUpdates \
+  ARCHS="$BUILD_ARCH" VALID_ARCHS="$BUILD_ARCH" IPHONEOS_DEPLOYMENT_TARGET="$MIN_IOS" \
   -allowProvisioningDeviceRegistration build > .private/provision.log 2>&1 || true
 python3 - <<'PY'
 import datetime, fnmatch, os, pathlib, plistlib, subprocess
