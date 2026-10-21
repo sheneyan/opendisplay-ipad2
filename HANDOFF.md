@@ -24,6 +24,10 @@ Raw device screenshots and host logs remain local under ignored `build/evidence/
 
 The user approved trying 1280x960 logical desktop space with unchanged 1024x768 transport. Only the legacy hello desktop-size fields and build number changed; physical panel facts and decode limits remain unchanged. Build 3's signed IPA was retained locally for rollback. Build 4 compiled, passed binary checks, was signed and installed on the iPad. macOS reported a 1280x960 logical desktop (2560x1920 backing), and sender logs confirmed a 1024x768 H.264 stream. All three displays remained online and unmirrored. A device screenshot of the visual smoke window showed 12/16/24 pt text, color blocks and the advancing counter at 8.3 seconds; the receiver reported 253 submitted frames and zero errors. Subjective readability remains a user evaluation; this change does not increase physical display resolution.
 
+## Build 5 clean display
+
+The diagnostics label is hidden; desktop sizing and video limits are unchanged. Build 5 passed compilation, armv7/iOS metadata checks and signature verification, then installed and launched on the iPad. A fresh USB screenshot confirmed the received desktop has no bottom diagnostics overlay. GitHub About now describes the native iOS 9 / armv7 USB receiver, no-jailbreak operation and MIT license in English, with relevant repository topics.
+
 ## Build environment
 
 - Xcode 26.6 clang and `ld-classic`, invoked directly because modern Xcode's build system rejects armv7.
@@ -34,7 +38,7 @@ The user approved trying 1280x960 logical desktop space with unchanged 1024x768 
 ## Current limitations
 
 - USB and landscape only. No touch, audio, HEVC or portrait switching.
-- A small status strip covers the bottom of the received image.
+- Build 5 hides the diagnostics strip so it no longer covers the received image.
 - OpenDisplay 1.19.0 ignores the receiver's advertised 30 fps ceiling. Submitted-frame counters are not physical display FPS measurements.
 - After exiting the receiver, manually click Connect in the sender if necessary. Automatic app-exit reconnect is not claimed.
 - Actual cable unplug/replug, thermal behavior, extended daily use, physical end-to-end latency and other iPad models are unverified.
@@ -43,6 +47,5 @@ The user approved trying 1280x960 logical desktop space with unchanged 1024x768 
 ## Next work, only if requested
 
 1. Check daily-use stability and cable unplug/replug on the actual device.
-2. Make the diagnostics strip optional.
-3. Validate iPad mini 1 on real hardware before advertising support.
-4. Add touch input or portrait support as separate, explicitly scoped changes.
+2. Validate iPad mini 1 on real hardware before advertising support.
+3. Add touch input or portrait support as separate, explicitly scoped changes.

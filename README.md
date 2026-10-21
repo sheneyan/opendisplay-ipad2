@@ -27,7 +27,7 @@ Build 4 requests a larger 1280 × 960 desktop while retaining the 1024 × 768 vi
 ## Current scope
 
 - USB only; the receiver listens on loopback TCP port 9000, with no Wi-Fi listener.
-- Landscape, full-screen video, TCP cursor overlay and a small diagnostics strip.
+- Landscape, full-screen video and TCP cursor overlay. The diagnostics strip is hidden in Build 5 and later.
 - H.264 only, with an encoded raster ceiling of 1024 × 768.
 - No touch input, audio, Pencil, HEVC, portrait switching or background streaming.
 - Keeping the app in the foreground disables auto-lock; leaving the app tears down the receiver.
@@ -146,7 +146,7 @@ Device screenshots can be collected locally with `idevicescreenshot`. Their stor
 
 | Path | Responsibility |
 | --- | --- |
-| `app/main.m` | UIKit lifecycle, foreground receiver and status strip |
+| `app/main.m` | UIKit lifecycle, foreground receiver and hidden diagnostics label |
 | `app/ODReceiver.m` | USB TCP listener, framing, pv3 hello, heartbeat and reconnect state |
 | `app/ODVideoView.m` | H.264 parameter sets, owned CoreMedia buffers, display layer and cursor |
 | `app/ODProtocol.c` | Bounded frame assembly, control demux and Annex B traversal |

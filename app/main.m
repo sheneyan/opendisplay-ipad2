@@ -30,6 +30,7 @@
     status.textAlignment = NSTextAlignmentCenter;
     status.font = [UIFont systemFontOfSize:12];
     status.text = @"Legacy Display - starting USB receiver";
+    status.hidden = YES;
     [controller.view addSubview:status];
     self.receiver = [[ODReceiver alloc] initWithVideoView:video];
     self.receiver.onStatus = ^(NSString *text) { status.text = text; };
