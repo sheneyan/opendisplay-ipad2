@@ -1,0 +1,6 @@
+build/
+.toolchain/
+.private/
+__pycache__/
+*.ipa
+*.mobileprovision
