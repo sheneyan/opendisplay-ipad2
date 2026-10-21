@@ -10,6 +10,9 @@
 @end
 @interface ODReceiver : NSObject
 @property(nonatomic, copy) void (^onStatus)(NSString *);
+@property(nonatomic, copy) void (^onInputReset)(void);
+@property(atomic, readonly) NSUInteger inputSession;
+- (void)sendInput:(NSDictionary *)message session:(NSUInteger)session;
 - (instancetype)initWithVideoView:(id<ODVideoSink>)view;
 - (void)start;
 - (void)stop;

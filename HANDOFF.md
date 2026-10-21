@@ -57,7 +57,7 @@ The Mac-unlock follow-up below supersedes the initial blocked test. Build 7 subs
 
 ## Current limitations
 
-- USB and landscape only. No touch, audio, HEVC or portrait switching.
+- USB and landscape only. Build 8 adds touch input; no audio, HEVC or portrait switching.
 - Build 5 hides the diagnostics strip so it no longer covers the received image.
 - OpenDisplay 1.19.0 ignores the receiver's advertised 30 fps ceiling. Submitted-frame counters are not physical display FPS measurements.
 - After exiting the receiver, manually click Connect in the sender if necessary. Automatic app-exit reconnect is not claimed.
@@ -68,7 +68,7 @@ The Mac-unlock follow-up below supersedes the initial blocked test. Build 7 subs
 
 1. Check daily-use stability and cable unplug/replug on the actual device.
 2. Validate iPad mini 1 on real hardware before advertising support.
-3. Add touch input or portrait support as separate, explicitly scoped changes.
+3. Add portrait support or additional gestures only as separately requested changes.
 
 ## Mac launcher for an unresponsive iPad 2 Home button
 
@@ -91,3 +91,13 @@ Build 7 compiled for both architectures, passed the armv7 metadata check and `gi
 The user confirmed that the Build 7 list appeared and 1600x1200 was checked. Fresh sender logs at 14:30:01–14:30:03 show the receiver reconnecting, a 3200x2400 hello, an online 1600x1200-point virtual display, and a 2048x1536 H.264 capture. Host display enumeration independently confirms the logical dimensions and Mirror Off, with the internal panel and existing physical monitor still online. A mini USB screenshot (`mini-build7-1600.png`) shows the targeted smoke window's text, color blocks and animated counter at 9.1 seconds. This verifies long press → select → reconnect → actual displayed result. All three protocol/transport test variants passed again after the device acceptance.
 
 Remaining verification boundaries: higher desktop presets, changing Video Quality through the physical UI, and selection persistence across a full app relaunch have not been separately exercised. Independent preferences and invalid-value fallback are covered by real TCP hello tests. Long-duration performance is unmeasured. These are not prerequisites to publishing the now-verified 1600x1200 settings path, and the README explicitly labels the larger presets experimental.
+
+## Build 8 touch controls
+
+The user requested tap, drag and two-finger scrolling on both devices while retaining the mini settings hold. The client implements the published OpenDisplay 1.19.0 pv3 `touch` / `scroll` messages independently. `ODTouchInput` owns gesture arbitration and aspect-fit mapping; `ODTouchView` adapts UIKit contacts and the one-second mini timer. Taps commit on lift, movement of eight view points starts a drag, and a second contact cancels a drag before scrolling. Remaining contacts must lift before a new click. A mini settings hold emits no mouse press.
+
+The receiver sends input on its existing serial queue. Gesture messages carry the connection session captured at contact start, so stale input cannot control a new session. Active mouse-down state is released before receiver stop/disconnect; the UIKit gesture is cancelled on backgrounding, session reset and video geometry changes. Scroll deltas use decoded-video pixels; touch coordinates are normalized within the actual aspect-fit image.
+
+Tests first demonstrated missing tap output and missing session-bound transport, then passed after implementation. The full sanitizer suite covers gesture transitions, aspect-fit/letterbox mapping, clamping, long-press suppression, cancellation, real TCP input messages, stale-session rejection and release-before-sleep over ten reconnects in both build variants. Both architectures compiled; legacy binary checks and development signature verification passed. Previous signed Build 5 (iPad 2) and Build 7 (mini) packages remain local for rollback.
+
+Both actual devices report installed Build 8. Live sender sessions report iPad 2 at 1280x960 desktop / 1024x768 H.264 and mini 2 at 1600x1200 desktop / 2048x1536 H.264. The existing internal and physical external displays remain online and unmirrored. `scripts/touch-smoke.swift` creates its own temporary target windows and records received events to an ignored local JSONL file; it does not synthesize input or move existing windows. Device screenshots show nonzero tap, drag and scroll counters on each window. The user confirmed that both devices were operated directly by finger: taps, drags and two-finger scrolling reached the target windows. On mini 2, a stationary one-second hold opened Display Settings, and closing it did not increase the Tap counter. These physical acceptance checks passed.

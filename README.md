@@ -48,7 +48,8 @@ The armv7 builds from Build 4 onward request a larger 1280 × 960 desktop while 
 - USB only; the receiver listens on loopback TCP port 9000, with no Wi-Fi listener.
 - Landscape, full-screen video and TCP cursor overlay. The diagnostics strip is hidden in Build 5 and later.
 - H.264 only. The armv7 build keeps its 1024 × 768 video ceiling; the arm64 build offers selectable video ceilings through 2048 × 1536.
-- No touch input, audio, Pencil, HEVC, portrait switching or background streaming.
+- Build 8 adds tap-to-click, single-finger drag and two-finger natural scrolling on both build targets.
+- No audio, Pencil-specific input, HEVC, portrait switching or background streaming.
 - Keeping the app in the foreground disables auto-lock; leaving the app tears down the receiver.
 
 The receiver advertises a 30 fps capability for newer senders. **OpenDisplay 1.19.0 ignores that capability and still uses its own nominal 60 fps pipeline.** Do not describe this test as a verified 30 or 60 fps presentation result.
@@ -206,11 +207,22 @@ The signer verifies the profile's device/app authorization, expiration, developm
 2. On the Mac, open **OpenDisplay**, select **Extend**, and click **Connect** next to the correct USB iPad.
 3. Open **System Settings → Displays → Arrange** (or OpenDisplay's **Arrange Displays…**) and position the iPad display to match your desk.
 4. Drag a window or move the pointer beyond that edge of your Mac desktop. An empty wallpaper on the iPad means an extended desktop is active; move a window onto it to see content.
-5. Use the Mac keyboard and mouse. Touch input on the iPad is not implemented.
+5. Use the Mac keyboard and mouse, or touch the iPad with Build 8 and later. Enable **Accessibility** for OpenDisplay on the Mac for touch input.
 
 The armv7 logical desktop is **1280 × 960**, scaled into a **1024 × 768** video stream. The arm64 build offers independent desktop and video settings (see below). The sender may display `1024×768` in its connection status even though macOS reports a 1280 × 960 desktop. Small text can look soft after scaling. The original Build 5 configuration did not use a Retina iPad's full panel resolution.
 
 To reconnect later, plug in USB, unlock the iPad, open Legacy Display, then click **Connect** in OpenDisplay if needed. Leaving the receiver app or locking the iPad stops its receiver. To disconnect intentionally, use **Disconnect** in OpenDisplay. Renew the development profile and re-sign/reinstall when it expires. Installing on another iPad requires a profile authorizing that device, even if the app's architecture matches.
+
+### Touch controls (Build 8 and later)
+
+- **Click:** tap with one finger and lift. The click is sent on release.
+- **Drag:** touch the item and move one finger, then lift to release it. Small initial finger jitter is ignored.
+- **Scroll:** move two fingers together over the content. The content follows your fingers. Lift both fingers before beginning another click or drag.
+- **mini 2 settings:** hold one finger still for one second to open Display Settings. This hold does not send a Mac click; moving first starts a drag instead. Tap Done to return.
+
+Touch coordinates follow the displayed video, including letterboxing and independently selected desktop/video sizes. A second finger cancels an active drag before scrolling. Backgrounding, disconnecting, or changing video geometry cancels the gesture; begin a fresh gesture after reconnecting. These controls do not implement right-click, double-click recognition, pinch zoom, scroll inertia or Apple Pencil pressure.
+
+Build 8 was physically tested on iPad 2 (iOS 9.3.5) and iPad mini 2 (iOS 12.5.8) with OpenDisplay 1.19.0: finger taps, drags and two-finger scrolling reached the Mac test windows on both devices. The mini settings hold opened Display Settings without registering a click.
 
 ### Launch from the Mac without the iPad Home button
 
@@ -251,6 +263,7 @@ The arm64 desktop default remains 1280 × 960; the video default is 2048 × 1536
 | No matching profile or local identity | Check the selected team/account, certificate in Keychain, profile expiry, bundle ID and target device authorization. See `.private/provision.log` locally. |
 | Installation rejected on iOS 11+ | Use the arm64 output, not the 32-bit IPA. The supplied arm64 route requires iOS 12+. |
 | OpenDisplay says to open the app | Launch **Legacy Display** on the iPad and leave it foreground, then retry Connect. |
+| Touch has no effect | Confirm OpenDisplay has Accessibility permission on the Mac, the receiver is Build 8 or later, and a live desktop is displayed. |
 | Black screen after connecting | Unlock the Mac; confirm Screen Recording permission, Extend mode, and the correct USB device. Retry Disconnect/Connect with the receiver open. |
 | Wallpaper but no windows | The new desktop is empty. Check its arrangement and drag a window onto it. |
 | App worked before but no longer launches | Check development profile/certificate validity; obtain a valid profile, re-sign and reinstall. |
@@ -279,6 +292,8 @@ Device screenshots can be collected locally with `idevicescreenshot`. Their stor
 | Path | Responsibility |
 | --- | --- |
 | `app/main.m` | UIKit lifecycle, foreground receiver and hidden diagnostics label |
+| `app/ODTouchInput.m` | Tap/drag/scroll policy, coordinate mapping and settings-hold arbitration |
+| `app/ODTouchView.m` | UIKit contacts, hold timer and connection-session binding |
 | `app/ODDisplaySettings.m` | Independent desktop/video presets and legacy hello dimensions |
 | `app/ODReceiver.m` | USB TCP listener, framing, pv3 hello, heartbeat and reconnect state |
 | `app/ODVideoView.m` | H.264 parameter sets, owned CoreMedia buffers, display layer and cursor |

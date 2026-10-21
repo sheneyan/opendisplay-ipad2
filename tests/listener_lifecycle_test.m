@@ -28,6 +28,15 @@ static BOOL readExactly(int fd, void *buffer, size_t size) {
     }
     return YES;
 }
+static NSDictionary *readControl(int fd) {
+    uint32_t n;
+    if (!readExactly(fd,&n,4)) return nil;
+    n=ntohl(n);
+    if (!n || n>65536) return nil;
+    NSMutableData *data=[NSMutableData dataWithLength:n];
+    if (!readExactly(fd,data.mutableBytes,n)) return nil;
+    return [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+}
 int main(void) {
     @autoreleasepool {
         TestSink *sink = [TestSink new];
@@ -43,6 +52,10 @@ int main(void) {
         [receiver start];
         for (int i=0; !listening && !failed && i<100; i++) pump(0.01);
         if (failed || !listening) return 1;
+        if (![receiver respondsToSelector:@selector(sendInput:session:)]) {
+            fprintf(stderr,"FAIL: receiver has no session-bound input transport\n"); return 1;
+        }
+        NSUInteger previousSession=0;
         for (int cycle=0; cycle<10; cycle++) {
             /* Exercise settings through the real TCP hello, including stale
                invalid values and independent desktop/video selections. */
@@ -87,7 +100,27 @@ int main(void) {
                 fprintf(stderr, "FAIL: desktop/video/panel negotiation does not match selected settings\n");
                 close(fd); return 1;
             }
-            close(fd); pump(0.01);
+            NSUInteger session=receiver.inputSession;
+            if (!session || session == previousSession) {
+                fprintf(stderr,"FAIL: input needs a fresh connected session\n"); return 1;
+            }
+            /* A stale drag must never move/click a new connection. */
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.9,@"y":@0.9} session:previousSession];
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.25,@"y":@0.5} session:session];
+            NSDictionary *down=readControl(fd);
+            if (![down[@"phase"] isEqual:@"began"] || ![down[@"x"] isEqual:@0.25]) return 1;
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"cancelled",@"x":@0.25,@"y":@0.5} session:session];
+            if (![readControl(fd)[@"phase"] isEqual:@"cancelled"]) return 1;
+            [receiver sendInput:@{@"type":@"scroll",@"dx":@12,@"dy":@-24} session:session];
+            NSDictionary *scroll=readControl(fd);
+            if (![scroll[@"type"] isEqual:@"scroll"] || ![scroll[@"dy"] isEqual:@-24]) return 1;
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.5,@"y":@0.5} session:session];
+            if (![readControl(fd)[@"phase"] isEqual:@"began"]) return 1;
+            [receiver stop];
+            if (![readControl(fd)[@"phase"] isEqual:@"cancelled"] || ![readControl(fd)[@"type"] isEqual:@"sleeping"]) return 1;
+            previousSession=session;
+            close(fd); pump(0.02);
+            [receiver start]; pump(0.02);
         }
         [receiver stop]; pump(0.05);
         puts("PASS: 10 immediate stop/start cycles, real loopback socket and pv3 hello on every reconnect");

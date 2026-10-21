@@ -7,8 +7,10 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <math.h>
 
 @interface ODReceiver ()
+@property(atomic, readwrite) NSUInteger inputSession;
 - (void)receivedBytes:(const uint8_t *)bytes size:(size_t)size;
 @end
 static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
@@ -25,6 +27,8 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     NSString *_installID, *_connectionText;
     NSTimeInterval _lastReceive;
     BOOL _wantsRunning;
+    BOOL _inputDown;
+    double _inputX, _inputY;
 }
 - (instancetype)initWithVideoView:(id<ODVideoSink>)view {
     if ((self = [super init])) {
@@ -43,6 +47,31 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     return self;
 }
 - (void)dealloc { ODFrameReaderDestroy(&_reader); }
+- (void)sendInput:(NSDictionary *)message session:(NSUInteger)session {
+    NSDictionary *event = [message copy];
+    dispatch_async(_queue, ^{
+        if (!session || session != self.inputSession || self->_client < 0) return;
+        if ([event[@"type"] isEqual:@"touch"]) {
+            NSString *phase=event[@"phase"];
+            if (![@[@"began",@"moved",@"ended",@"cancelled"] containsObject:phase]) return;
+            double x=[event[@"x"] doubleValue], y=[event[@"y"] doubleValue];
+            if (!isfinite(x) || !isfinite(y) || x<0 || x>1 || y<0 || y>1) return;
+            if ([phase isEqual:@"moved"] && self->_outgoing.length > 32768) return;
+            if ([phase isEqual:@"began"]) self->_inputDown=YES;
+            if ([phase isEqual:@"ended"] || [phase isEqual:@"cancelled"]) self->_inputDown=NO;
+            self->_inputX=x; self->_inputY=y;
+        } else if ([event[@"type"] isEqual:@"scroll"]) {
+            double dx=[event[@"dx"] doubleValue], dy=[event[@"dy"] doubleValue];
+            if (!isfinite(dx) || !isfinite(dy) || fabs(dx)>16384 || fabs(dy)>16384 || self->_outgoing.length > 32768) return;
+        } else return;
+        [self sendControl:event];
+    });
+}
+- (void)releaseInput {
+    if (!_inputDown) return;
+    _inputDown=NO;
+    [self sendControl:@{@"type":@"touch",@"phase":@"cancelled",@"x":@(_inputX),@"y":@(_inputY)}];
+}
 - (void)publish:(NSString *)text {
     void (^callback)(NSString *) = self.onStatus;
     if (callback) dispatch_async(dispatch_get_main_queue(), ^{ callback(text); });
@@ -92,6 +121,7 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
 - (void)stop {
     dispatch_async(_queue, ^{
         self->_wantsRunning = NO;
+        [self releaseInput];
         [self sendControl:@{@"type":@"sleeping"}];
         [self disconnect];
         if (self->_listenerSource) dispatch_source_cancel(self->_listenerSource);
@@ -100,6 +130,8 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     });
 }
 - (void)disconnect {
+    [self releaseInput];
+    self.inputSession=0;
     _generation++;
     if (_writeSource) { dispatch_source_cancel(_writeSource); _writeSource = nil; }
     if (_readSource) { dispatch_source_cancel(_readSource); _readSource = nil; }
@@ -109,6 +141,8 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     [_video resetStream];
     _connectionText = @"Listening over USB :9000";
     [self publish:_connectionText];
+    void (^reset)(void)=self.onInputReset;
+    if (reset) dispatch_async(dispatch_get_main_queue(), reset);
 }
 - (void)acceptClients {
     int fd;
@@ -139,6 +173,7 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
         NSMutableDictionary *hello = [ODDisplayFields(expanded, [NSUserDefaults standardUserDefaults]) mutableCopy];
         [hello addEntriesFromDictionary:@{@"type":@"hello", @"pv":@3, @"id":_installID, @"device":@"iPad"}];
         [self sendControl:hello];
+        if (_client >= 0) self.inputSession=_generation;
         NSLog(@"LegacyDisplay USB accepted; hello pv3 sent");
     }
 }

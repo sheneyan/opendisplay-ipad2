@@ -38,13 +38,18 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
 - (NSUInteger)submittedFrames { return _submittedFrames; }
 - (NSUInteger)decodeErrors { return _decodeErrors; }
 - (NSString *)streamDescription { return _streamDescription; }
+- (CGSize)videoPixelSize { return _videoSize; }
 - (void)resetStream {
     if (_format) { CFRelease(_format); _format = NULL; }
     _sps = nil; _pps = nil; _waitingForIDR = YES;
     _submittedFrames = _decodeErrors = 0; _lastKeyframeRequest = 0;
     [_videoLayer flushAndRemoveImage];
     _streamDescription = @"Waiting for H.264";
-    dispatch_async(dispatch_get_main_queue(), ^{ self->_cursorView.hidden = YES; });
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self->_cursorView.hidden = YES;
+        self->_videoSize=CGSizeZero;
+        if (self.onGeometryChanged) self.onGeometryChanged();
+    });
 }
 - (void)askForKeyframe {
     NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
@@ -88,6 +93,7 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
             NSLog(@"LegacyDisplay %@", _streamDescription);
             dispatch_async(dispatch_get_main_queue(), ^{
                 self->_videoSize = CGSizeMake(dimensions.width, dimensions.height);
+                if (self.onGeometryChanged) self.onGeometryChanged();
                 [self positionCursor];
             });
         }

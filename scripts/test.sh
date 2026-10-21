@@ -15,3 +15,8 @@ xcrun clang -DOD_RETINA_SETTINGS=1 -Wall -Wextra -Werror -Wno-unused-parameter -
   "$ROOT/app/ODReceiver.m" "$ROOT/app/ODDisplaySettings.m" "$ROOT/app/ODProtocol.c" -framework Foundation \
   -o "$ROOT/build/tests/retina_settings_test"
 "$ROOT/build/tests/retina_settings_test"
+
+xcrun clang -Wall -Wextra -Werror -Wno-unused-parameter -fobjc-arc -fblocks \
+  -fsanitize=address,undefined -I"$ROOT/app" "$ROOT/tests/touch_input_tests.m" \
+  "$ROOT/app/ODTouchInput.m" -framework Foundation -o "$ROOT/build/tests/touch_input_tests"
+"$ROOT/build/tests/touch_input_tests"

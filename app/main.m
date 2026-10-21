@@ -2,6 +2,7 @@
 #import "ODReceiver.h"
 #import "ODVideoView.h"
 #import "ODDisplaySettings.h"
+#import "ODTouchView.h"
 
 #if OD_RETINA_SETTINGS
 @interface LegacySettingsController : UITableViewController
@@ -58,14 +59,8 @@
 @end
 @implementation LegacyViewController
 #if OD_RETINA_SETTINGS
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    UILongPressGestureRecognizer *press = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(openSettings:)];
-    press.minimumPressDuration = 1.0;
-    [self.view addGestureRecognizer:press];
-}
-- (void)openSettings:(UILongPressGestureRecognizer *)gesture {
-    if (gesture.state != UIGestureRecognizerStateBegan || self.presentedViewController) return;
+- (void)openSettings {
+    if (self.presentedViewController) return;
     LegacySettingsController *settings = [[LegacySettingsController alloc] initWithStyle:UITableViewStyleGrouped];
     settings.onConfigurationChanged = self.onConfigurationChanged;
     UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:settings];
@@ -82,6 +77,7 @@
 @interface LegacyAppDelegate : UIResponder <UIApplicationDelegate>
 @property(nonatomic, strong) UIWindow *window;
 @property(nonatomic, strong) ODReceiver *receiver;
+@property(nonatomic, strong) ODTouchView *touchView;
 @end
 
 @implementation LegacyAppDelegate
@@ -91,6 +87,17 @@
     ODVideoView *video = [[ODVideoView alloc] initWithFrame:controller.view.bounds];
     video.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [controller.view addSubview:video];
+    self.touchView=[[ODTouchView alloc] initWithFrame:controller.view.bounds];
+    self.touchView.autoresizingMask=UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [controller.view addSubview:self.touchView];
+    __weak ODVideoView *weakVideo=video;
+    __weak ODTouchView *weakTouch=self.touchView;
+    self.touchView.videoSize=^{ return weakVideo.videoPixelSize; };
+    video.onGeometryChanged=^{ [weakTouch refreshGeometry]; };
+#if OD_RETINA_SETTINGS
+    __weak LegacyViewController *weakController=controller;
+    self.touchView.onSettings=^{ [weakTouch cancelInput]; [weakController openSettings]; };
+#endif
     UILabel *status = [[UILabel alloc] initWithFrame:CGRectMake(0, controller.view.bounds.size.height-32,
                                                                controller.view.bounds.size.width, 32)];
     status.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
@@ -104,6 +111,9 @@
     self.receiver = [[ODReceiver alloc] initWithVideoView:video];
     self.receiver.onStatus = ^(NSString *text) { status.text = text; };
     __weak ODReceiver *receiver = self.receiver;
+    self.touchView.session=^{ return receiver.inputSession; };
+    self.touchView.onMessage=^(NSDictionary *message, NSUInteger session) { [receiver sendInput:message session:session]; };
+    self.receiver.onInputReset=^{ [weakTouch cancelInput]; };
     controller.onConfigurationChanged = ^{ [receiver stop]; [receiver start]; };
     self.window.rootViewController = controller;
     [self.window makeKeyAndVisible];
@@ -113,6 +123,7 @@
     return YES;
 }
 - (void)applicationDidBecomeActive:(UIApplication *)application { [self.receiver start]; }
+- (void)applicationWillResignActive:(UIApplication *)application { [self.touchView cancelInput]; }
 - (void)applicationDidEnterBackground:(UIApplication *)application { [self.receiver stop]; }
 @end
 
