@@ -44,6 +44,13 @@ int main(void) {
         for (int i=0; !listening && !failed && i<100; i++) pump(0.01);
         if (failed || !listening) return 1;
         for (int cycle=0; cycle<10; cycle++) {
+            /* Exercise settings through the real TCP hello, including stale
+               invalid values and independent desktop/video selections. */
+            int desktop = cycle == 0 ? 1280 : cycle == 1 ? 4096 : cycle == 2 ? 1280 : 9999;
+            int video = cycle == 0 ? 2048 : cycle == 1 ? 1024 : cycle == 2 ? 1920 : -1;
+            NSDictionary *preferences = cycle == 0 ? @{} :
+                @{@"ODDesktopWidth":@(desktop), @"ODVideoWidth":@(video)};
+            [[NSUserDefaults standardUserDefaults] setVolatileDomain:preferences forName:NSArgumentDomain];
             int before = listening;
             /* Queue the restart before cancellation completes: the reported race. */
             [receiver stop]; [receiver start];
@@ -63,6 +70,23 @@ int main(void) {
             if (!readExactly(fd, data.mutableBytes, length)) { close(fd); return 1; }
             NSDictionary *hello = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
             if (![hello[@"type"] isEqual:@"hello"] || ![hello[@"pv"] isEqual:@3]) { close(fd); return 1; }
+#if OD_RETINA_SETTINGS
+            if (desktop == 9999) desktop = 1280;
+            if (video < 0) video = 2048;
+            int panel = 2048, scale = 2;
+#else
+            desktop = 1280; video = 1024;
+            int panel = 1024, scale = 1;
+#endif
+            if ([hello[@"pixelsWide"] intValue] != desktop*2 ||
+                [hello[@"pixelsHigh"] intValue] != desktop*3/2 ||
+                [hello[@"maxEncodeWide"] intValue] != video ||
+                [hello[@"maxEncodeHigh"] intValue] != video*3/4 ||
+                [hello[@"panel"][@"pixelsWide"] intValue] != panel ||
+                [hello[@"panel"][@"scale"] intValue] != scale) {
+                fprintf(stderr, "FAIL: desktop/video/panel negotiation does not match selected settings\n");
+                close(fd); return 1;
+            }
             close(fd); pump(0.01);
         }
         [receiver stop]; pump(0.05);

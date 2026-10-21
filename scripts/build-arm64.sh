@@ -9,7 +9,7 @@ mkdir -p "$APP" "$OUT/objects"
 objects=()
 for source in "$ROOT"/app/*.m "$ROOT"/app/*.c; do
   object="$OUT/objects/$(basename "${source%.*}").o"
-  options=(-fblocks)
+  options=(-fblocks -DOD_RETINA_SETTINGS=1)
   if [[ "$source" == *.m ]]; then options+=(-fobjc-arc); fi
   # These legacy APIs are intentional: the app must still run on iOS 12.
   xcrun clang -target arm64-apple-ios12.0 -isysroot "$SDK" "${options[@]}" \

@@ -38,6 +38,16 @@ The arm64 Build 5 package passed signing verification, installation and launch, 
 
 The English README now walks through sender setup, architecture selection, tools, SDKs, device trust, provisioning, signing, installation, daily use, reconnects, expiration and troubleshooting. Only the two device/OS combinations above are hardware-verified. Raw mini screenshots and diagnostics remain under ignored `build/evidence/` and `.private/`.
 
+## Build 6 resolution controls
+
+The user requested independent resolution choice on the mini 2. The arm64 build now enables a one-second long press menu with separate desktop presets (1024x768 through 4096x3072) and video ceilings (1024x768 through 2048x1536). Selections persist in NSUserDefaults and reconnect the receiver. The armv7 build retains its fixed 1280x960 desktop / 1024x768 stream. Physical panel metadata now distinguishes these build targets. The final Build 6 default is 1280x960 desktop with a 2048x1536 video ceiling.
+
+The real TCP handshake test first failed against the old fixed settings, then passed after implementation. Both legacy and expanded test variants cover independent selections, maximum desktop negotiation, invalid saved values, physical panel facts and ten immediate listener restart cycles. Both architectures compile, and the armv7 binary metadata check passes. The arm64 Build 6 was signed, installed and launched on the mini; the installed iPad 2 app remains Build 5.
+
+An initial 2048x1536 desktop / 2048x1536 video attempt created a virtual display object but never reached an online capturable screen. Later native UI inspection reported that the Mac was locked and automatic unlock failed. This confounds the attempt: do not claim that resolution exceeds a hardware limit, or that captured stale desktop pixels prove native video decoding. The latest installed package defaults to the previously working desktop size, but the sender may need its mini-only Refresh/Disconnect/Connect after unlocking.
+
+The Mac-unlock follow-up below supersedes the initial blocked test. Build 7 subsequently passed the settings UI and 1600x1200 desktop reconfiguration check. Raw evidence stays under ignored `build/evidence/`.
+
 ## Build environment
 
 - Xcode 26.6 clang and `ld-classic`, invoked directly because modern Xcode's build system rejects armv7.
@@ -59,3 +69,17 @@ The English README now walks through sender setup, architecture selection, tools
 1. Check daily-use stability and cable unplug/replug on the actual device.
 2. Validate iPad mini 1 on real hardware before advertising support.
 3. Add touch input or portrait support as separate, explicitly scoped changes.
+
+### Build 6 follow-up after Mac unlock
+
+The user unlocked the Mac and reported that long press seemed unresponsive. Inspection confirmed installed Build 6 and the expected gesture/menu selectors in the arm64 executable. The Mac sender reported the mini receiver asleep/backgrounded; a fresh remote launch reopened it. On the unlocked Mac, the 1280x960 desktop came online and the sender logged a 2048x1536 H.264 capture. A fresh screenshot (`mini-native-unlocked-test.png`) shows the smoke window's text/color blocks and counter at 19.5 seconds, proving actual native-sized video reception rather than only negotiation.
+
+### Build 7 settings presentation correction
+
+The user confirmed that a direct long press on the mini opens Display Settings, but tapping Desktop Size did nothing. The previous implementation chained alert controllers and explicitly dismissed the root controller while UIKit was already dismissing the selected alert action. Build 7 replaces that flow with one grouped table in a navigation form sheet. Desktop Size and Video Quality are sections with directly selectable resolution rows, persistent checkmarks and a Done button; no nested alert presentation remains.
+
+Build 7 compiled for both architectures, passed the armv7 metadata check and `git diff --check`, and the arm64 package passed signing verification, installation and remote launch. Device package enumeration confirms installed version 7 on the mini. The iPad 2 remains on its accepted Build 5. The underlying settings/handshake tests had already passed both legacy and expanded variants before this UIKit-only correction.
+
+The user confirmed that the Build 7 list appeared and 1600x1200 was checked. Fresh sender logs at 14:30:01–14:30:03 show the receiver reconnecting, a 3200x2400 hello, an online 1600x1200-point virtual display, and a 2048x1536 H.264 capture. Host display enumeration independently confirms the logical dimensions and Mirror Off, with the internal panel and existing physical monitor still online. A mini USB screenshot (`mini-build7-1600.png`) shows the targeted smoke window's text, color blocks and animated counter at 9.1 seconds. This verifies long press → select → reconnect → actual displayed result. All three protocol/transport test variants passed again after the device acceptance.
+
+Remaining verification boundaries: higher desktop presets, changing Video Quality through the physical UI, and selection persistence across a full app relaunch have not been separately exercised. Independent preferences and invalid-value fallback are covered by real TCP hello tests. Long-duration performance is unmeasured. These are not prerequisites to publishing the now-verified 1600x1200 settings path, and the README explicitly labels the larger presets experimental.

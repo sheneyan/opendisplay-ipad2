@@ -1,5 +1,6 @@
 #import "ODReceiver.h"
 #import "ODProtocol.h"
+#import "ODDisplaySettings.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -130,16 +131,14 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
         _lastReceive = [NSDate timeIntervalSinceReferenceDate];
         _ticks = 0;
         _connectionText = @"USB connected";
-        /* v1.19 sizes its desktop at half pixelsWide/High. Advertise the
-           desired 1280x960 desktop in legacy 2x units; keep the wire at
-           the physical panel's 1024x768 decode ceiling.
-           New senders may instead consume the factual panel object. */
-        [self sendControl:@{@"type":@"hello", @"pv":@3, @"id":_installID, @"device":@"iPad",
-            @"pixelsWide":@2560, @"pixelsHigh":@1920, @"scale":@1,
-            @"maxEncodeWide":@1024, @"maxEncodeHigh":@768,
-            @"displayMaxFrameRate":@30,
-            @"panel":@{@"pixelsWide":@1024, @"pixelsHigh":@768, @"scale":@1},
-            @"videoCaps":@[@{@"codec":@"h264", @"maxWidth":@1024, @"maxHeight":@768, @"maxFrameRate":@30}]}];
+#if OD_RETINA_SETTINGS
+        BOOL expanded = YES;
+#else
+        BOOL expanded = NO;
+#endif
+        NSMutableDictionary *hello = [ODDisplayFields(expanded, [NSUserDefaults standardUserDefaults]) mutableCopy];
+        [hello addEntriesFromDictionary:@{@"type":@"hello", @"pv":@3, @"id":_installID, @"device":@"iPad"}];
+        [self sendControl:hello];
         NSLog(@"LegacyDisplay USB accepted; hello pv3 sent");
     }
 }

@@ -32,22 +32,22 @@ Tested on October 21, 2026:
 | Sender | OpenDisplay 1.19.0 |
 | Connection | USB / macOS usbmuxd |
 | Extended desktop | 1280 × 960 logical points; sender creates a 2560 × 1920 HiDPI backing display (Build 4 and later) |
-| Actual video | 1024 × 768 H.264 High Profile, Level 3.2 |
+| Original video baseline | 1024 × 768 H.264 High Profile, Level 3.2 (Build 5 on both devices) |
 | Display coexistence | Mac internal display + existing 1920 × 1080 physical monitor + iPad 2 + iPad mini 2, four online displays, all unmirrored |
 
 The app was compiled, development-signed, installed and launched on the real iPad. Device screenshots verified a moved test window, 12/16/24 pt text, color blocks, an animated counter and a cursor. The display layer reported zero errors during these checks. The submitted-frame counter is **not a measurement of physical display FPS or latency**.
 
-The iPad mini 2 separately passed arm64 build, signing, installation, launch and USB display checks with Build 5. Device screenshots confirmed the text/color test window and advancing animation counter, with no diagnostics overlay. The mini trial used the same 1024 × 768 stream ceiling; full Retina streaming and long-duration use on this device have not been tested. The zero-error-counter observation above refers to the earlier iPad 2 diagnostics checks.
+The iPad mini 2 separately passed arm64 build, signing, installation, launch and USB display checks with Build 5. Device screenshots confirmed the text/color test window and advancing animation counter, with no diagnostics overlay. The Build 5 mini trial used a 1024 × 768 stream ceiling. Build 6 later displayed a 2048 × 1536 H.264 stream on the real mini at a 1280 × 960 logical desktop after unlocking the Mac, with the text/color/animation test visible in a USB screenshot. Long-duration use remains untested. The zero-error-counter observation above refers to the earlier iPad 2 diagnostics checks.
 
 Force-quitting and relaunching the receiver, then clicking **Connect** in OpenDisplay on the Mac, restored the extended display. Automatic reconnection after an app exit is not guaranteed by the tested sender. Cable unplug/replug and long-duration use have not been tested.
 
-Build 4 and later request a larger 1280 × 960 desktop while retaining the 1024 × 768 video ceiling and physical panel dimensions. The Mac scales the desktop into the video stream: this provides more workspace, not more physical pixels. Text becomes smaller and may appear soft. OpenDisplay's connection status reports the video size; macOS display settings report the logical desktop size. Builds 1–3 requested a 1024 × 768 desktop. The legacy sizing fields target OpenDisplay 1.19.0. The separate panel metadata still describes the original iPad 2; newer senders that consume it have not been validated, including on the mini 2.
+The armv7 builds from Build 4 onward request a larger 1280 × 960 desktop while retaining the 1024 × 768 video ceiling and physical panel dimensions. The Mac scales the desktop into the video stream: this provides more workspace, not more physical pixels. Text becomes smaller and may appear soft. OpenDisplay's connection status reports the video size; macOS display settings report the logical desktop size. Builds 1–3 requested a 1024 × 768 desktop. The legacy sizing fields target OpenDisplay 1.19.0. Build 6 reports the mini 2 panel as 2048 × 1536 at 2x in the arm64 build; newer senders have not been validated.
 
 ## Current scope
 
 - USB only; the receiver listens on loopback TCP port 9000, with no Wi-Fi listener.
 - Landscape, full-screen video and TCP cursor overlay. The diagnostics strip is hidden in Build 5 and later.
-- H.264 only, with an encoded raster ceiling of 1024 × 768.
+- H.264 only. The armv7 build keeps its 1024 × 768 video ceiling; the arm64 build offers selectable video ceilings through 2048 × 1536.
 - No touch input, audio, Pencil, HEVC, portrait switching or background streaming.
 - Keeping the app in the foreground disables auto-lock; leaving the app tears down the receiver.
 
@@ -129,7 +129,7 @@ export APP_PATH="$PWD/build/arm64/LegacyDisplay.app"
 export BUILD_ARCH=arm64
 ```
 
-The script prints `arm64` and a minimum OS of `12.0`. This separate output directory preserves the armv7 build. It uses the same 1280 × 960 desktop request, 1024 × 768 H.264 ceiling and hidden diagnostics overlay.
+The script prints `arm64` and a minimum OS of `12.0`. This separate output directory preserves the armv7 build. Build 7 enables the mini 2 resolution settings described below. The diagnostics overlay remains hidden.
 
 ## 4. Pair the iPad and create its signing profile
 
@@ -202,15 +202,31 @@ The signer verifies the profile's device/app authorization, expiration, developm
 
 ## 6. Connect and use the extra desktop
 
-1. Keep the USB cable connected and **Legacy Display** open on the iPad in landscape orientation. A black screen before connection is normal: Build 5 hides the diagnostics overlay.
+1. Keep the Mac unlocked, the USB cable connected and **Legacy Display** open on the iPad in landscape orientation. A black screen before connection is normal: Build 5 hides the diagnostics overlay.
 2. On the Mac, open **OpenDisplay**, select **Extend**, and click **Connect** next to the correct USB iPad.
 3. Open **System Settings → Displays → Arrange** (or OpenDisplay's **Arrange Displays…**) and position the iPad display to match your desk.
 4. Drag a window or move the pointer beyond that edge of your Mac desktop. An empty wallpaper on the iPad means an extended desktop is active; move a window onto it to see content.
 5. Use the Mac keyboard and mouse. Touch input on the iPad is not implemented.
 
-The default logical desktop is **1280 × 960**, scaled into a **1024 × 768** video stream. The sender may display `1024×768` in its connection status even though macOS reports a 1280 × 960 desktop. Small text can look soft after scaling. This initial configuration does not use a Retina iPad's full panel resolution.
+The armv7 logical desktop is **1280 × 960**, scaled into a **1024 × 768** video stream. The arm64 build offers independent desktop and video settings (see below). The sender may display `1024×768` in its connection status even though macOS reports a 1280 × 960 desktop. Small text can look soft after scaling. The original Build 5 configuration did not use a Retina iPad's full panel resolution.
 
 To reconnect later, plug in USB, unlock the iPad, open Legacy Display, then click **Connect** in OpenDisplay if needed. Leaving the receiver app or locking the iPad stops its receiver. To disconnect intentionally, use **Disconnect** in OpenDisplay. Renew the development profile and re-sign/reinstall when it expires. Installing on another iPad requires a profile authorizing that device, even if the app's architecture matches.
+
+## iPad mini 2 resolution settings (arm64 Build 7 and later)
+
+**Hold anywhere on the iPad image for one second** to open **Display Settings**. This also works when no desktop image is arriving. The page lists both groups of resolutions; a checkmark identifies the saved selection in each group. Tap a resolution row directly, scroll down for Video Quality, and tap **Done** to return to the display.
+
+- **Desktop Size**: 1024 × 768, 1280 × 960, 1440 × 1080, 1600 × 1200, 1920 × 1440, 2048 × 1536, 2560 × 1920, 3072 × 2304, or 4096 × 3072.
+- **Video Quality**: 1024 × 768, 1280 × 960, 1440 × 1080, 1600 × 1200, 1920 × 1440, or 2048 × 1536.
+- Selecting a value saves it on the iPad and reconnects that receiver. Click **Connect** in the Mac sender if automatic reconnection does not resume. The iPad 2 armv7 build keeps its existing fixed settings.
+
+The [mini 2 panel](https://support.apple.com/en-ie/112019) has 2048 × 1536 physical pixels. Larger desktop sizes fit more content by making it smaller; they cannot add physical pixels. The video setting controls the transport ceiling, separately from desktop space. OpenDisplay's Quality option can reduce the actual stream below that ceiling. For tests at the requested ceiling, select **Best (native)** on the Mac.
+
+Sizes above 2048 × 1536 are marked experimental. Even smaller options can be rejected by macOS virtual-display creation or the receiver's decoder. The first 2048 × 1536 desktop attempt did not become an online Mac virtual display, before a new video stream started. The Mac was subsequently found locked, so that attempt does not establish a resolution or decoder limit. If a selected desktop fails, hold the iPad image and return **Desktop Size** to **1280 × 960**. If video fails, lower **Video Quality** to **1024 × 768**. No Mac restart is required to access the receiver's menu.
+
+Build 7 was verified on the mini 2 through the actual settings page: a long press opened the list, tapping **1600 × 1200** selected the row, and the receiver reconnected. macOS reported an online, unmirrored **1600 × 1200** desktop; sender logs confirmed a **2048 × 1536** H.264 stream. A device screenshot showed the test text, color blocks and animated counter after the change. The remaining desktop presets have not all been tested on hardware.
+
+The arm64 desktop default remains 1280 × 960; the video default is 2048 × 1536. Every listed choice remains selectable. Display-mode creation, decoding and sustained performance must be distinguished; offering a choice does not certify that mode on every Mac/OS combination.
 
 ## Troubleshooting
 
@@ -223,7 +239,7 @@ To reconnect later, plug in USB, unlock the iPad, open Legacy Display, then clic
 | No matching profile or local identity | Check the selected team/account, certificate in Keychain, profile expiry, bundle ID and target device authorization. See `.private/provision.log` locally. |
 | Installation rejected on iOS 11+ | Use the arm64 output, not the 32-bit IPA. The supplied arm64 route requires iOS 12+. |
 | OpenDisplay says to open the app | Launch **Legacy Display** on the iPad and leave it foreground, then retry Connect. |
-| Black screen after connecting | Confirm Screen Recording permission on the Mac, Extend mode, and the correct USB device. Retry Disconnect/Connect with the receiver open. |
+| Black screen after connecting | Unlock the Mac; confirm Screen Recording permission, Extend mode, and the correct USB device. Retry Disconnect/Connect with the receiver open. |
 | Wallpaper but no windows | The new desktop is empty. Check its arrangement and drag a window onto it. |
 | App worked before but no longer launches | Check development profile/certificate validity; obtain a valid profile, re-sign and reinstall. |
 
@@ -251,6 +267,7 @@ Device screenshots can be collected locally with `idevicescreenshot`. Their stor
 | Path | Responsibility |
 | --- | --- |
 | `app/main.m` | UIKit lifecycle, foreground receiver and hidden diagnostics label |
+| `app/ODDisplaySettings.m` | Independent desktop/video presets and legacy hello dimensions |
 | `app/ODReceiver.m` | USB TCP listener, framing, pv3 hello, heartbeat and reconnect state |
 | `app/ODVideoView.m` | H.264 parameter sets, owned CoreMedia buffers, display layer and cursor |
 | `app/ODProtocol.c` | Bounded frame assembly, control demux and Annex B traversal |

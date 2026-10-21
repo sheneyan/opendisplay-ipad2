@@ -1,10 +1,79 @@
 #import <UIKit/UIKit.h>
 #import "ODReceiver.h"
 #import "ODVideoView.h"
+#import "ODDisplaySettings.h"
+
+#if OD_RETINA_SETTINGS
+@interface LegacySettingsController : UITableViewController
+@property(nonatomic, copy) void (^onConfigurationChanged)(void);
+@end
+@implementation LegacySettingsController
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = @"Display Settings";
+    self.preferredContentSize = CGSizeMake(560, 620);
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(closeSettings)];
+}
+- (void)closeSettings { [self dismissViewControllerAnimated:YES completion:nil]; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return ODResolutionWidths(section == 1).count;
+}
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    return section == 0 ? @"Desktop Size" : @"Video Quality";
+}
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    return section == 0
+        ? @"Tap a size to apply it. Larger desktops fit more content with smaller text. Sizes above 2048 × 1536 are experimental. Scroll down for Video Quality."
+        : @"Higher video sizes send more detail. If playback fails, choose a lower value. Changes are saved and reconnect this display. Tap Done to return.";
+}
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"resolution"];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"resolution"];
+    BOOL video = indexPath.section == 1;
+    NSInteger width = [ODResolutionWidths(video)[indexPath.row] integerValue];
+    NSDictionary *fields = ODDisplayFields(YES, [NSUserDefaults standardUserDefaults]);
+    NSInteger selected = video ? [fields[@"maxEncodeWide"] integerValue] : [fields[@"pixelsWide"] integerValue]/2;
+    cell.textLabel.text = [NSString stringWithFormat:@"%ld × %ld%@", (long)width, (long)(width*3/4),
+        !video && width > 2048 ? @" (experimental)" : @""];
+    cell.accessoryType = width == selected ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    return cell;
+}
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    BOOL video = indexPath.section == 1;
+    NSInteger width = [ODResolutionWidths(video)[indexPath.row] integerValue];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setInteger:width forKey:video ? @"ODVideoWidth" : @"ODDesktopWidth"];
+    [defaults synchronize];
+    NSLog(@"LegacyDisplay selected %@ %ldx%ld", video ? @"video" : @"desktop", (long)width, (long)(width*3/4));
+    [tableView reloadData];
+    if (self.onConfigurationChanged) self.onConfigurationChanged();
+}
+@end
+#endif
 
 @interface LegacyViewController : UIViewController
+@property(nonatomic, copy) void (^onConfigurationChanged)(void);
 @end
 @implementation LegacyViewController
+#if OD_RETINA_SETTINGS
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    UILongPressGestureRecognizer *press = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(openSettings:)];
+    press.minimumPressDuration = 1.0;
+    [self.view addGestureRecognizer:press];
+}
+- (void)openSettings:(UILongPressGestureRecognizer *)gesture {
+    if (gesture.state != UIGestureRecognizerStateBegan || self.presentedViewController) return;
+    LegacySettingsController *settings = [[LegacySettingsController alloc] initWithStyle:UITableViewStyleGrouped];
+    settings.onConfigurationChanged = self.onConfigurationChanged;
+    UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:settings];
+    navigation.modalPresentationStyle = UIModalPresentationFormSheet;
+    navigation.preferredContentSize = CGSizeMake(560, 620);
+    [self presentViewController:navigation animated:YES completion:nil];
+}
+#endif
 - (BOOL)prefersStatusBarHidden { return YES; }
 - (BOOL)shouldAutorotate { return NO; }
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations { return UIInterfaceOrientationMaskLandscape; }
@@ -18,7 +87,7 @@
 @implementation LegacyAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-    UIViewController *controller = [[LegacyViewController alloc] init];
+    LegacyViewController *controller = [[LegacyViewController alloc] init];
     ODVideoView *video = [[ODVideoView alloc] initWithFrame:controller.view.bounds];
     video.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [controller.view addSubview:video];
@@ -34,6 +103,8 @@
     [controller.view addSubview:status];
     self.receiver = [[ODReceiver alloc] initWithVideoView:video];
     self.receiver.onStatus = ^(NSString *text) { status.text = text; };
+    __weak ODReceiver *receiver = self.receiver;
+    controller.onConfigurationChanged = ^{ [receiver stop]; [receiver start]; };
     self.window.rootViewController = controller;
     [self.window makeKeyAndVisible];
     application.idleTimerDisabled = YES;
