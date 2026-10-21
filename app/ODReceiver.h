@@ -14,6 +14,7 @@
 @property(atomic, readonly) NSUInteger inputSession;
 - (void)sendInput:(NSDictionary *)message session:(NSUInteger)session;
 - (instancetype)initWithVideoView:(id<ODVideoSink>)view;
+- (void)setPortrait:(BOOL)portrait;
 - (void)start;
 - (void)stop;
 @end

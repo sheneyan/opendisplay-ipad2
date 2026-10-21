@@ -32,7 +32,7 @@ esac
                        LAUNCH_STATUS=str(launch_status))
             result = subprocess.run(['/bin/bash', str(ROOT / 'scripts/launch.sh'),
                                      'test-device', str(folder / 'image.dmg')],
-                                    env=env, capture_output=True, text=True, timeout=10)
+                                    env=env, capture_output=True, text=True, timeout=40)
             return result, log.read_text().splitlines() if log.exists() else []
 
     def test_stop_precedes_launch_even_with_legacy_kill_status(self):

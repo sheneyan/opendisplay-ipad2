@@ -4,6 +4,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+@interface ODReceiver (RotationContract)
+- (void)setPortrait:(BOOL)portrait;
+@end
+
 /* The real transport runs on the host; only the iOS hardware renderer is substituted. */
 @interface TestSink : NSObject <ODVideoSink>
 @property(nonatomic, copy) void (^requestKeyframe)(void);
@@ -28,7 +32,7 @@ static BOOL readExactly(int fd, void *buffer, size_t size) {
     }
     return YES;
 }
-static NSDictionary *readControl(int fd) {
+static NSDictionary *readFrameControl(int fd) {
     uint32_t n;
     if (!readExactly(fd,&n,4)) return nil;
     n=ntohl(n);
@@ -36,6 +40,13 @@ static NSDictionary *readControl(int fd) {
     NSMutableData *data=[NSMutableData dataWithLength:n];
     if (!readExactly(fd,data.mutableBytes,n)) return nil;
     return [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+}
+static NSDictionary *readControl(int fd) {
+    for (;;) {
+        NSDictionary *message=readFrameControl(fd);
+        // Heartbeats legitimately share the socket during the rotation debounce.
+        if (![message[@"type"] isEqual:@"ping"]) return message;
+    }
 }
 int main(void) {
     @autoreleasepool {
@@ -55,6 +66,9 @@ int main(void) {
         if (![receiver respondsToSelector:@selector(sendInput:session:)]) {
             fprintf(stderr,"FAIL: receiver has no session-bound input transport\n"); return 1;
         }
+        if (![receiver respondsToSelector:@selector(setPortrait:)]) {
+            fprintf(stderr,"FAIL: receiver has no live orientation update\n"); return 1;
+        }
         NSUInteger previousSession=0;
         for (int cycle=0; cycle<10; cycle++) {
             /* Exercise settings through the real TCP hello, including stale
@@ -66,7 +80,9 @@ int main(void) {
             [[NSUserDefaults standardUserDefaults] setVolatileDomain:preferences forName:NSArgumentDomain];
             int before = listening;
             /* Queue the restart before cancellation completes: the reported race. */
-            [receiver stop]; [receiver start];
+            [receiver stop];
+            BOOL portrait = cycle % 2 != 0;
+            [receiver setPortrait:portrait]; [receiver start];
             for (int i=0; listening < before+2 && !failed && i<100; i++) pump(0.01);
             if (failed || listening < before+2) return 1;
             int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -91,11 +107,11 @@ int main(void) {
             desktop = 1280; video = 1024;
             int panel = 1024, scale = 1;
 #endif
-            if ([hello[@"pixelsWide"] intValue] != desktop*2 ||
-                [hello[@"pixelsHigh"] intValue] != desktop*3/2 ||
-                [hello[@"maxEncodeWide"] intValue] != video ||
-                [hello[@"maxEncodeHigh"] intValue] != video*3/4 ||
-                [hello[@"panel"][@"pixelsWide"] intValue] != panel ||
+            if ([hello[@"pixelsWide"] intValue] != (portrait ? desktop*3/2 : desktop*2) ||
+                [hello[@"pixelsHigh"] intValue] != (portrait ? desktop*2 : desktop*3/2) ||
+                [hello[@"maxEncodeWide"] intValue] != (portrait ? video*3/4 : video) ||
+                [hello[@"maxEncodeHigh"] intValue] != (portrait ? video : video*3/4) ||
+                [hello[@"panel"][@"pixelsWide"] intValue] != (portrait ? panel*3/4 : panel) ||
                 [hello[@"panel"][@"scale"] intValue] != scale) {
                 fprintf(stderr, "FAIL: desktop/video/panel negotiation does not match selected settings\n");
                 close(fd); return 1;
@@ -116,9 +132,46 @@ int main(void) {
             if (![scroll[@"type"] isEqual:@"scroll"] || ![scroll[@"dy"] isEqual:@-24]) return 1;
             [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.5,@"y":@0.5} session:session];
             if (![readControl(fd)[@"phase"] isEqual:@"began"]) return 1;
+            [receiver setPortrait:!portrait];
+            [receiver setPortrait:portrait];
+            [receiver setPortrait:!portrait]; // Rapid turns settle into one reconnect.
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.9,@"y":@0.9} session:session];
+            if (![readControl(fd)[@"phase"] isEqual:@"cancelled"]) {
+                fprintf(stderr,"FAIL: rotation must release drag before hello\n"); return 1;
+            }
+            if (![readControl(fd)[@"type"] isEqual:@"sleeping"]) {
+                fprintf(stderr,"FAIL: rotation must request a fresh sender session to retain the decode ceiling\n"); return 1;
+            }
+            char end;
+            if (recv(fd,&end,1,0) != 0) { fprintf(stderr,"FAIL: rotation must close the retired stream\n"); return 1; }
+            close(fd);
+            fd=socket(AF_INET,SOCK_STREAM,0);
+            setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof timeout);
+            if (connect(fd,(struct sockaddr *)&address,sizeof address)) return 1;
+            NSDictionary *rotated=readControl(fd);
+            if (![rotated[@"type"] isEqual:@"hello"] || ![rotated[@"id"] isEqual:hello[@"id"]] ||
+                [rotated[@"pixelsWide"] intValue] != (portrait ? desktop*2 : desktop*3/2) ||
+                [rotated[@"pixelsHigh"] intValue] != (portrait ? desktop*3/2 : desktop*2) ||
+                [rotated[@"maxEncodeWide"] intValue] != (portrait ? video : video*3/4) ||
+                [rotated[@"maxEncodeHigh"] intValue] != (portrait ? video*3/4 : video) ||
+                [rotated[@"panel"][@"pixelsWide"] intValue] != (portrait ? panel : panel*3/4) ||
+                [rotated[@"panel"][@"pixelsHigh"] intValue] != (portrait ? panel*3/4 : panel) ||
+                [rotated[@"videoCaps"][0][@"maxWidth"] intValue] != (portrait ? video : video*3/4) ||
+                [rotated[@"videoCaps"][0][@"maxHeight"] intValue] != (portrait ? video*3/4 : video)) {
+                fprintf(stderr,"FAIL: live orientation must swap desktop, panel and video on the fresh socket\n"); return 1;
+            }
+            NSUInteger rotatedSession=receiver.inputSession;
+            if (!rotatedSession || rotatedSession==session) return 1;
+            [receiver setPortrait:!portrait]; // Repeated layout must not emit another hello.
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.9,@"y":@0.9} session:session];
+            [receiver sendInput:@{@"type":@"touch",@"phase":@"began",@"x":@0.25,@"y":@0.75} session:rotatedSession];
+            NSDictionary *newDown=readControl(fd);
+            if (![newDown[@"phase"] isEqual:@"began"] || ![newDown[@"y"] isEqual:@0.75]) {
+                fprintf(stderr,"FAIL: old-orientation input must be rejected and unchanged orientation deduplicated\n"); return 1;
+            }
             [receiver stop];
             if (![readControl(fd)[@"phase"] isEqual:@"cancelled"] || ![readControl(fd)[@"type"] isEqual:@"sleeping"]) return 1;
-            previousSession=session;
+            previousSession=rotatedSession;
             close(fd); pump(0.02);
             [receiver start]; pump(0.02);
         }

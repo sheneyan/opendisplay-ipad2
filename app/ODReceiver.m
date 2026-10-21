@@ -1,6 +1,8 @@
+#import "ODLog.h"
 #import "ODReceiver.h"
 #import "ODProtocol.h"
 #import "ODDisplaySettings.h"
+#import "ODVideoDelivery.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -21,18 +23,18 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     dispatch_queue_t _queue;
     dispatch_source_t _listenerSource, _readSource, _writeSource, _timer;
     int _listener, _client;
-    NSUInteger _generation, _ticks;
+    NSUInteger _generation, _ticks, _inputEpoch, _orientationRevision;
     ODFrameReader _reader;
     NSMutableData *_outgoing;
     NSString *_installID, *_connectionText;
     NSTimeInterval _lastReceive;
-    BOOL _wantsRunning;
+    BOOL _wantsRunning, _portrait;
     BOOL _inputDown;
     double _inputX, _inputY;
 }
 - (instancetype)initWithVideoView:(id<ODVideoSink>)view {
     if ((self = [super init])) {
-        _video = view; _listener = _client = -1;
+        _video = [[ODVideoDelivery alloc] initWithRenderer:view]; _listener = _client = -1;
         _queue = dispatch_queue_create("com.sheneyan.oldipad.receiver", DISPATCH_QUEUE_SERIAL);
         ODFrameReaderInit(&_reader, 8 * 1024 * 1024);
         _outgoing = [NSMutableData data];
@@ -42,7 +44,15 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
             [[NSUserDefaults standardUserDefaults] setObject:_installID forKey:@"receiverID"];
         }
         __weak ODReceiver *weakSelf = self;
-        view.requestKeyframe = ^{ [weakSelf sendControl:@{@"type":@"kf"}]; };
+        _video.requestKeyframe = ^{
+            ODReceiver *receiver=weakSelf;
+            if (!receiver) return;
+            NSUInteger session=receiver.inputSession;
+            dispatch_async(receiver->_queue, ^{
+                if (session && session==receiver.inputSession)
+                    [receiver sendControl:@{@"type":@"kf"}];
+            });
+        };
     }
     return self;
 }
@@ -116,7 +126,7 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     dispatch_resume(self->_timer);
     self->_connectionText = @"Listening over USB :9000";
     [self publish:self->_connectionText];
-    NSLog(@"LegacyDisplay receiver listening on loopback :9000");
+    ODLog(@"LegacyDisplay receiver listening on loopback :9000");
 }
 - (void)stop {
     dispatch_async(_queue, ^{
@@ -165,17 +175,42 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
         _lastReceive = [NSDate timeIntervalSinceReferenceDate];
         _ticks = 0;
         _connectionText = @"USB connected";
+        self.inputSession=++_inputEpoch;
+        [self sendHello];
+        ODLog(@"LegacyDisplay USB accepted; hello pv3 sent");
+    }
+}
+- (void)sendHello {
 #if OD_RETINA_SETTINGS
         BOOL expanded = YES;
 #else
         BOOL expanded = NO;
 #endif
-        NSMutableDictionary *hello = [ODDisplayFields(expanded, [NSUserDefaults standardUserDefaults]) mutableCopy];
+        NSMutableDictionary *hello = [ODDisplayFieldsForOrientation(expanded, [NSUserDefaults standardUserDefaults], _portrait) mutableCopy];
         [hello addEntriesFromDictionary:@{@"type":@"hello", @"pv":@3, @"id":_installID, @"device":@"iPad"}];
         [self sendControl:hello];
-        if (_client >= 0) self.inputSession=_generation;
-        NSLog(@"LegacyDisplay USB accepted; hello pv3 sent");
-    }
+}
+- (void)setPortrait:(BOOL)portrait {
+    dispatch_async(_queue, ^{
+        if (self->_portrait == portrait) return;
+        [self releaseInput];
+        self->_portrait=portrait;
+        NSUInteger revision=++self->_orientationRevision;
+        NSUInteger generation=self->_generation;
+        self.inputSession=0;
+        void (^reset)(void)=self.onInputReset;
+        if (reset) dispatch_async(dispatch_get_main_queue(), reset);
+        // OpenDisplay 1.19's in-place resize skips maxEncodeWide/High.
+        // End the old session using pv3 sleep/wake so a fresh hello goes
+        // through initial setup, which preserves the decode ceiling.
+        // Coalesce quick turns; never close a connection accepted meanwhile.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 600*NSEC_PER_MSEC), self->_queue, ^{
+            if (revision != self->_orientationRevision || generation != self->_generation || self->_client < 0) return;
+            [self sendControl:@{@"type":@"sleeping"}];
+            [self disconnect];
+        });
+        ODLog(@"LegacyDisplay orientation %@", portrait ? @"portrait" : @"landscape");
+    });
 }
 - (void)sendControl:(NSDictionary *)message {
     if (_client < 0) return;
@@ -217,7 +252,7 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
         _lastReceive = [NSDate timeIntervalSinceReferenceDate];
         @autoreleasepool {
             if (ODFrameReaderFeed(&_reader, bytes, (size_t)n, receivedFrame, (__bridge void *)self)) {
-                NSLog(@"LegacyDisplay invalid frame length"); [self disconnect]; return;
+                ODLog(@"LegacyDisplay invalid frame length"); [self disconnect]; return;
             }
         }
     }
@@ -231,7 +266,7 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
     if ([message[@"type"] isEqual:@"cursor"] || [message[@"type"] isEqual:@"cursorImg"])
         [_video applyCursorMessage:message];
     else if ([message[@"type"] isEqual:@"welcome"])
-        NSLog(@"LegacyDisplay sender welcome pv=%@ min=%@", message[@"pv"], message[@"min"]);
+        ODLog(@"LegacyDisplay sender welcome pv=%@ min=%@", message[@"pv"], message[@"min"]);
     else if ([message[@"type"] isEqual:@"updateRequired"])
         _connectionText = @"Sender requires a newer receiver protocol";
     else if ([message[@"type"] isEqual:@"streamConfig"] && ![message[@"codec"] isEqual:@"h264"])

@@ -63,5 +63,12 @@ int main(void) { @autoreleasepool {
     [input setViewWidth:1024 height:768 videoWidth:0 height:0];
     [input updateCount:1 x:50 y:50]; [input hold]; [input updateCount:0 x:50 y:50];
     CHECK(settings == 2 && events.count == 0, "mini settings remains available without video");
+    [input setViewWidth:768 height:1024 videoWidth:1536 height:2048];
+    [input updateCount:1 x:192 y:768]; [input updateCount:0 x:192 y:768];
+    CHECK(near(events[0][@"x"],.25) && near(events[0][@"y"],.75), "portrait tap maps to displayed video");
+    [events removeAllObjects];
+    [input updateCount:2 x:192 y:512]; [input updateCount:2 x:202 y:532];
+    CHECK(near(events.lastObject[@"dx"],20) && near(events.lastObject[@"dy"],40), "portrait scroll retains video-pixel axes");
+    [input updateCount:0 x:202 y:532];
     puts("PASS: tap, drag, natural two-finger scroll, settings hold, aspect-fit mapping and cancellation");
 } }

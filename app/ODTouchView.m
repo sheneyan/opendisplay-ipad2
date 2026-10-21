@@ -12,9 +12,7 @@
         self.backgroundColor=[UIColor clearColor];
         _contacts=[NSMutableSet set];
         _input=[ODTouchInput new];
-#if OD_RETINA_SETTINGS
         _input.settingsEnabled=YES;
-#endif
         __weak ODTouchView *weakSelf=self;
         _input.onMessage=^(NSDictionary *message) {
             ODTouchView *view=weakSelf;
@@ -49,11 +47,9 @@
     if (locations.count) { point.x/=locations.count; point.y/=locations.count; }
     [_input updateCount:_contacts.count x:point.x y:point.y];
     if (_contacts.count != 1) { [_holdTimer invalidate]; _holdTimer=nil; }
-#if OD_RETINA_SETTINGS
     if (!before && _contacts.count == 1) {
         _holdTimer=[NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(held:) userInfo:nil repeats:NO];
     }
-#endif
 }
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event { [self updateTouches:touches beginning:YES ending:NO]; }
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event { [self updateTouches:touches beginning:NO ending:NO]; }

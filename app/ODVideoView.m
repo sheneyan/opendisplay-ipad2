@@ -1,3 +1,4 @@
+#import "ODLog.h"
 #import "ODVideoView.h"
 #import "ODProtocol.h"
 #import <CoreMedia/CoreMedia.h>
@@ -45,11 +46,9 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
     _submittedFrames = _decodeErrors = 0; _lastKeyframeRequest = 0;
     [_videoLayer flushAndRemoveImage];
     _streamDescription = @"Waiting for H.264";
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self->_cursorView.hidden = YES;
-        self->_videoSize=CGSizeZero;
-        if (self.onGeometryChanged) self.onGeometryChanged();
-    });
+    _cursorView.hidden = YES;
+    _videoSize=CGSizeZero;
+    if (self.onGeometryChanged) self.onGeometryChanged();
 }
 - (void)askForKeyframe {
     NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
@@ -83,25 +82,23 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
         [_videoLayer flushAndRemoveImage];
         if (status) {
             _decodeErrors++; _streamDescription = [NSString stringWithFormat:@"H.264 format error %d", (int)status];
-            NSLog(@"LegacyDisplay %@", _streamDescription);
+            ODLog(@"LegacyDisplay %@", _streamDescription);
         } else {
             CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(_format);
             const uint8_t *sps = _sps.bytes;
             _streamDescription = [NSString stringWithFormat:@"H.264 %dx%d profile %u level %.1f",
                 (int)dimensions.width, (int)dimensions.height, _sps.length > 1 ? sps[1] : 0,
                 _sps.length > 3 ? sps[3]/10.0 : 0];
-            NSLog(@"LegacyDisplay %@", _streamDescription);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self->_videoSize = CGSizeMake(dimensions.width, dimensions.height);
-                if (self.onGeometryChanged) self.onGeometryChanged();
-                [self positionCursor];
-            });
+            ODLog(@"LegacyDisplay %@", _streamDescription);
+            _videoSize = CGSizeMake(dimensions.width, dimensions.height);
+            if (self.onGeometryChanged) self.onGeometryChanged();
+            [self positionCursor];
         }
     }
     if (!avcc.length) return;
     if (_videoLayer.status == AVQueuedSampleBufferRenderingStatusFailed) {
         _decodeErrors++; _waitingForIDR = YES;
-        NSLog(@"LegacyDisplay decode error: %@", _videoLayer.error);
+        ODLog(@"LegacyDisplay decode error: %@", _videoLayer.error);
         _streamDescription = [NSString stringWithFormat:@"Decoder failed: %@", _videoLayer.error.localizedDescription];
         [_videoLayer flush];
     }
@@ -132,7 +129,6 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
     if (block) CFRelease(block);
 }
 - (void)applyCursorMessage:(NSDictionary *)message {
-    dispatch_async(dispatch_get_main_queue(), ^{
         if ([message[@"type"] isEqual:@"cursorImg"]) {
             if (![message[@"png"] isKindOfClass:[NSString class]]) return;
             NSData *data = [[NSData alloc] initWithBase64EncodedString:message[@"png"] options:0];
@@ -145,7 +141,6 @@ static void collectNALU(void *context, const uint8_t *bytes, size_t size) {
                 self->_cursorPosition = CGPointMake([message[@"x"] doubleValue], [message[@"y"] doubleValue]);
         }
         [self positionCursor];
-    });
 }
 - (void)positionCursor {
     if (_videoSize.width <= 0 || _videoSize.height <= 0) return;

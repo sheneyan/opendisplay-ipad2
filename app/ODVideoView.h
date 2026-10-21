@@ -8,7 +8,7 @@
 @property(nonatomic, readonly) NSString *streamDescription;
 @property(nonatomic, readonly) CGSize videoPixelSize;
 @property(nonatomic, copy) void (^onGeometryChanged)(void);
-/* consume/reset are called only on the receiver's serial queue. */
+/* All renderer operations run on the main thread via ODVideoDelivery. */
 - (void)consumeVideo:(NSData *)payload;
 - (void)resetStream;
 - (void)applyCursorMessage:(NSDictionary *)message;

@@ -46,10 +46,10 @@ The armv7 builds from Build 4 onward request a larger 1280 × 960 desktop while 
 ## Current scope
 
 - USB only; the receiver listens on loopback TCP port 9000, with no Wi-Fi listener.
-- Landscape, full-screen video and TCP cursor overlay. The diagnostics strip is hidden in Build 5 and later.
+- Full-screen video and TCP cursor overlay. The diagnostics strip is hidden in Build 5 and later.
 - H.264 only. The armv7 build keeps its 1024 × 768 video ceiling; the arm64 build offers selectable video ceilings through 2048 × 1536.
 - Build 8 adds tap-to-click, single-finger drag and two-finger natural scrolling on both build targets.
-- No audio, Pencil-specific input, HEVC, portrait switching or background streaming.
+- No audio, Pencil-specific input, HEVC, WiFi or background streaming. Manual rotation is available in Build 13; see the [capability comparison](docs/capabilities.md) for remaining gaps.
 - Keeping the app in the foreground disables auto-lock; leaving the app tears down the receiver.
 
 The receiver advertises a 30 fps capability for newer senders. **OpenDisplay 1.19.0 ignores that capability and still uses its own nominal 60 fps pipeline.** Do not describe this test as a verified 30 or 60 fps presentation result.
@@ -57,7 +57,7 @@ The receiver advertises a 30 fps capability for newer senders. **OpenDisplay 1.1
 ## 1. Prepare the Mac sender
 
 1. Install and open the Mac sender from [OpenDisplay's releases](https://github.com/peetzweg/opendisplay/releases/tag/v1.19.0). Version **1.19.0** is the version tested here; later releases may negotiate display size differently.
-2. Grant **Screen Recording** when prompted so OpenDisplay can capture the desktop. Follow its restart prompt if one appears. Accessibility is used by the sender's input features; this receiver currently has no touch input.
+2. Grant **Screen Recording** when prompted so OpenDisplay can capture the desktop. Follow its restart prompt if one appears. Grant **Accessibility** to OpenDisplay for the receiver's touch controls.
 3. Choose **Extend** in OpenDisplay to create an independent desktop.
 4. Leave OpenDisplay running while you set up the iPad receiver. The official modern iPad app is not needed; this guide installs **Legacy Display** instead.
 
@@ -203,7 +203,7 @@ The signer verifies the profile's device/app authorization, expiration, developm
 
 ## 6. Connect and use the extra desktop
 
-1. Keep the Mac unlocked, the USB cable connected and **Legacy Display** open on the iPad in landscape orientation. A black screen before connection is normal: Build 5 hides the diagnostics overlay.
+1. Keep the Mac unlocked, the USB cable connected and **Legacy Display** open on the iPad. Build 13 keeps a fixed direction until you choose **Rotate 90°** in its long-press menu; moving the iPad does not rotate the display. A black screen before connection is normal: Build 5 hides the diagnostics overlay.
 2. On the Mac, open **OpenDisplay**, select **Extend**, and click **Connect** next to the correct USB iPad.
 3. Open **System Settings → Displays → Arrange** (or OpenDisplay's **Arrange Displays…**) and position the iPad display to match your desk.
 4. Drag a window or move the pointer beyond that edge of your Mac desktop. An empty wallpaper on the iPad means an extended desktop is active; move a window onto it to see content.
@@ -218,11 +218,29 @@ To reconnect later, plug in USB, unlock the iPad, open Legacy Display, then clic
 - **Click:** tap with one finger and lift. The click is sent on release.
 - **Drag:** touch the item and move one finger, then lift to release it. Small initial finger jitter is ignored.
 - **Scroll:** move two fingers together over the content. The content follows your fingers. Lift both fingers before beginning another click or drag.
-- **mini 2 settings:** hold one finger still for one second to open Display Settings. This hold does not send a Mac click; moving first starts a drag instead. Tap Done to return.
+- **Settings on either iPad (Build 13):** hold one finger still for one second to open Display Settings. This hold does not send a Mac click; moving first starts a drag instead. Tap Done to return.
 
 Touch coordinates follow the displayed video, including letterboxing and independently selected desktop/video sizes. A second finger cancels an active drag before scrolling. Backgrounding, disconnecting, or changing video geometry cancels the gesture; begin a fresh gesture after reconnecting. These controls do not implement right-click, double-click recognition, pinch zoom, scroll inertia or Apple Pencil pressure.
 
 Build 8 was physically tested on iPad 2 (iOS 9.3.5) and iPad mini 2 (iOS 12.5.8) with OpenDisplay 1.19.0: finger taps, drags and two-finger scrolling reached the Mac test windows on both devices. The mini settings hold opened Display Settings without registering a click.
+
+### Manual rotation (Build 13 and later)
+
+1. Hold one finger still on the display for **one second**. The menu also opens while waiting for video.
+2. In **Display Settings → Orientation**, tap **Rotate 90°**. The menu closes and the entire canvas rotates clockwise by a quarter turn. Allow the sender to reconnect before interacting with the desktop.
+3. Repeat to reach the desired direction. Four taps return to the original direction. The app saves the selection across restarts.
+
+**Rotation can be slow, especially on iPad mini 2.** The user confirmed that manual rotation works on the tested mini 2, but reported a noticeably long wait for the picture to return. A temporary black screen is expected while OpenDisplay recreates the virtual display and restarts capture. Wait for the image to recover before rotating again. Tests used an M1 Mac with macOS 26.5, OpenDisplay 1.19.0 and mini 2 on iOS 12.5.8. **The cause of the delay has not been isolated:** Mac performance, the higher video resolution, legacy-device decoding and sender/session behavior are possible contributors; this is not a confirmed M1 hardware limitation. Lower video resolution has not been validated as a fix.
+
+This works on **both iPad 2 and mini 2**. Gravity and the system Rotation Lock do not select the canvas direction. The video, cursor, touch layer and settings menu rotate together. A settings hold does not click the Mac desktop. Lift your fingers after rotating and begin a fresh touch gesture when the image returns. The mini retains its independent resolution settings; rotation does not lower either selection.
+
+The iPad 2 keeps a 1280×960 desktop and 1024×768 video in landscape, becoming 960×1280 and 768×1024 in portrait. The mini swaps its selected desktop/video dimensions. At 180° and 270°, the app also turns the canvas so all four physical placements are available.
+
+**Reconnect limitation:** OpenDisplay 1.19.0 omits the receiver decode ceiling during in-place resize. The receiver therefore requests a fresh session after a 0.6-second debounce. This recreates the virtual display and macOS may relocate windows. Initial setup honors the ceiling; sender capture recovery can still bypass it. No Mac sender modification has been installed.
+
+**Use one legacy iPad at a time when rotating.** On the tested Mac/OpenDisplay 1.19.0 setup, overlapping rotations with two iPads caused virtual-display creation failures, incorrect capture geometry and an oversized iPad 2 stream. This scenario remains unresolved. Disconnect the other iPad in OpenDisplay before rotating; a frozen session may need Disconnect → Connect.
+
+Build 13 keeps rendering and system logging off the USB receive queue. Logging is asynchronous and bounded because a real iPad 2 thread sample showed `NSLog` blocking its caller. An unresponsive logging service can now drop diagnostic messages rather than stall rendering or heartbeats. In isolated device tests, both iPad 2 and mini 2 completed two consecutive rotations with full-screen output and an advancing counter after each turn, retaining their selected desktop/video sizes. These probes invoked the same Rotate action automatically; the user also confirmed the final iPad 2 manual menu, full-screen output and touch behavior. The user confirmed that manual rotation also works on mini 2, with the slow recovery noted above; touch after rotation was not separately confirmed for mini 2. Reconnection still takes several seconds and can move windows; these changes do not eliminate sender-side display recreation or repair its multi-display recovery paths.
 
 ### Launch from the Mac without the iPad Home button
 

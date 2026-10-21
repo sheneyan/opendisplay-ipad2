@@ -1,0 +1,7 @@
+# Manual rotation, Build 11
+
+Approved by the user after automatic orientation failed acceptance on both devices. A one-second stationary hold opens Display Settings on iPad 2 and mini 2. Rotate 90° advances clockwise through four directions and saves the selection. The mini retains all desktop/video presets; iPad 2 keeps its fixed sizes. Moving the device does not change the app or sender orientation.
+
+Keep the UIKit window in one landscape orientation. Rotate a content container with public UIView transforms, swapping its bounds for odd quarter turns. Video, cursor, touch and an embedded settings navigation controller share that container, so UIKit converts physical touches into the same local coordinates as the video. This avoids private device-orientation setters and system rotation-lock dependencies. Close settings on Rotate, cancel current gestures, transform content and request matching sender dimensions. Initial launch restores the saved direction before starting the receiver. Desktop/video presets and decode ceilings remain independent.
+
+Retain the existing fresh-session workaround for sender 1.19.0 decode ceilings. Manual rotation does not promise faster reconnection or resolve the observed heartbeat stalls; report these separately. Do not modify the Mac sender or lower user-selected resolutions. Validate four directions, persistence, full-frame geometry, physical click/drag/scroll and no click emitted by the settings hold. Compilation and installation are not physical acceptance.
