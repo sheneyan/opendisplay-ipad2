@@ -14,13 +14,15 @@ Tested on October 21, 2026:
 | Host | M1 MacBook Air, macOS 26.5 (25F71) |
 | Sender | OpenDisplay 1.19.0 |
 | Connection | USB / macOS usbmuxd |
-| Extended desktop | 1024 × 768 logical points; sender creates a 2048 × 1536 HiDPI backing display |
+| Extended desktop | 1280 × 960 logical points; sender creates a 2560 × 1920 HiDPI backing display (Build 4) |
 | Actual video | 1024 × 768 H.264 High Profile, Level 3.2 |
 | Display coexistence | Mac internal display + existing 1920 × 1080 physical monitor + independent iPad desktop, all unmirrored |
 
 The app was compiled, development-signed, installed and launched on the real iPad. Device screenshots verified a moved test window, 12/16/24 pt text, color blocks, an animated counter and a cursor. The display layer reported zero errors during these checks. The submitted-frame counter is **not a measurement of physical display FPS or latency**.
 
 Force-quitting and relaunching the receiver, then clicking **Connect** in OpenDisplay on the Mac, restored the extended display. Automatic reconnection after an app exit is not guaranteed by the tested sender. Cable unplug/replug and long-duration use have not been tested.
+
+Build 4 requests a larger 1280 × 960 desktop while retaining the 1024 × 768 video ceiling and physical panel dimensions. The Mac scales the desktop into the video stream: this provides more workspace, not more physical pixels. Text becomes smaller and may appear soft. OpenDisplay's connection status reports the video size; macOS display settings report the logical desktop size. Builds 1–3 requested a 1024 × 768 desktop. The legacy sizing fields target OpenDisplay 1.19.0; newer senders may instead use the separately advertised physical panel facts.
 
 ## Current scope
 

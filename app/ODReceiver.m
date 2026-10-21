@@ -131,10 +131,11 @@ static void receivedFrame(void *context, const uint8_t *bytes, size_t size) {
         _ticks = 0;
         _connectionText = @"USB connected";
         /* v1.19 sizes its desktop at half pixelsWide/High. Advertise the
-           desired 1024x768 desktop in legacy 2x units, cap the wire to 1x.
+           desired 1280x960 desktop in legacy 2x units; keep the wire at
+           the physical panel's 1024x768 decode ceiling.
            New senders may instead consume the factual panel object. */
         [self sendControl:@{@"type":@"hello", @"pv":@3, @"id":_installID, @"device":@"iPad",
-            @"pixelsWide":@2048, @"pixelsHigh":@1536, @"scale":@1,
+            @"pixelsWide":@2560, @"pixelsHigh":@1920, @"scale":@1,
             @"maxEncodeWide":@1024, @"maxEncodeHigh":@768,
             @"displayMaxFrameRate":@30,
             @"panel":@{@"pixelsWide":@1024, @"pixelsHigh":@768, @"scale":@1},

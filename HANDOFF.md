@@ -4,7 +4,7 @@
 
 The non-jailbroken iPad 2 path works on the tested hardware. A development-signed armv7 app installs and launches on iOS 9.3.5, then receives H.264 from the unmodified OpenDisplay 1.19.0 Mac sender over USB.
 
-Verified display configuration: M1 MacBook Air internal display, existing 1920x1080 physical monitor, and a separate OpenDisplay iPad desktop. All three were online and unmirrored. The iPad desktop is 1024x768 logical points, with a 2048x1536 HiDPI backing display and an independently capped 1024x768 encoded stream.
+Verified display configuration: M1 MacBook Air internal display, existing 1920x1080 physical monitor, and a separate OpenDisplay iPad desktop. All three were online and unmirrored. Build 4 requests 1280x960 logical points, with a 2560x1920 HiDPI backing display and an independently capped 1024x768 encoded stream. Builds 1–3 requested 1024x768 logical points.
 
 ## Evidence
 
@@ -19,6 +19,10 @@ Verified display configuration: M1 MacBook Air internal display, existing 1920x1
 - The final Build 3 was development-signed, installed, launched and reconnected to the unmodified sender. A fresh device screenshot showed H.264 1024x768, profile 100 / level 3.2, and zero errors; fresh host enumeration again confirmed three online, unmirrored displays.
 
 Raw device screenshots and host logs remain local under ignored `build/evidence/`. Provisioning output and entitlements remain under ignored `.private/`. Never publish profiles, developer credentials, UDIDs or a device-specific signed IPA.
+
+## Build 4 desktop-size trial
+
+The user approved trying 1280x960 logical desktop space with unchanged 1024x768 transport. Only the legacy hello desktop-size fields and build number changed; physical panel facts and decode limits remain unchanged. Build 3's signed IPA was retained locally for rollback. Build 4 compiled, passed binary checks, was signed and installed on the iPad. macOS reported a 1280x960 logical desktop (2560x1920 backing), and sender logs confirmed a 1024x768 H.264 stream. All three displays remained online and unmirrored. A device screenshot of the visual smoke window showed 12/16/24 pt text, color blocks and the advancing counter at 8.3 seconds; the receiver reported 253 submitted frames and zero errors. Subjective readability remains a user evaluation; this change does not increase physical display resolution.
 
 ## Build environment
 
