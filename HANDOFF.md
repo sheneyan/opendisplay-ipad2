@@ -70,6 +70,14 @@ The Mac-unlock follow-up below supersedes the initial blocked test. Build 7 subs
 2. Validate iPad mini 1 on real hardware before advertising support.
 3. Add touch input or portrait support as separate, explicitly scoped changes.
 
+## Mac launcher for an unresponsive iPad 2 Home button
+
+`scripts/launch.sh DEVICE_UDID DEVELOPER_IMAGE` targets an exact USB device, mounts the matching developer disk image if absent, launches the installed receiver with `idevicedebug --detach`, and opens the Mac sender. It does not reinstall the app or change display settings. A device-specific wrapper stays in ignored `.private/launchers/`; public source contains no device identifier.
+
+On October 21, the attached iPad 2 initially reported no developer image. Mounting its existing iOS 9.3 image and launching succeeded. Fresh sender logs confirmed an online 1280x960 desktop and 1024x768 H.264 capture; a USB screenshot confirmed the received desktop. The launcher also passed shell syntax validation and rejected a nonexistent USB target.
+
+The user explicitly approved enabling Shortcuts' global Allow Running Scripts setting. A native Mac shortcut named `启动 iPad 2 副屏` now calls the private wrapper, with Show in Spotlight enabled and administrator execution off. Running it from the Shortcuts editor produced the launcher's successful completion output. Unlocking the physical iPad and keeping the development signature valid are still required.
+
 ### Build 6 follow-up after Mac unlock
 
 The user unlocked the Mac and reported that long press seemed unresponsive. Inspection confirmed installed Build 6 and the expected gesture/menu selectors in the arm64 executable. The Mac sender reported the mini receiver asleep/backgrounded; a fresh remote launch reopened it. On the unlocked Mac, the 1280x960 desktop came online and the sender logged a 2048x1536 H.264 capture. A fresh screenshot (`mini-native-unlocked-test.png`) shows the smoke window's text/color blocks and counter at 19.5 seconds, proving actual native-sized video reception rather than only negotiation.

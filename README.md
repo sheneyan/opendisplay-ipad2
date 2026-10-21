@@ -212,6 +212,18 @@ The armv7 logical desktop is **1280 × 960**, scaled into a **1024 × 768** vide
 
 To reconnect later, plug in USB, unlock the iPad, open Legacy Display, then click **Connect** in OpenDisplay if needed. Leaving the receiver app or locking the iPad stops its receiver. To disconnect intentionally, use **Disconnect** in OpenDisplay. Renew the development profile and re-sign/reinstall when it expires. Installing on another iPad requires a profile authorizing that device, even if the app's architecture matches.
 
+### Launch from the Mac without the iPad Home button
+
+Once the receiver is installed and the iPad trusts this Mac, launch it over USB:
+
+```sh
+bash scripts/launch.sh "$DEVICE_UDID" "/absolute/path/to/DeveloperDiskImage.dmg"
+```
+
+Use the matching developer image from the installation steps above, with its `.signature` file beside it. The launcher targets only the specified USB device, mounts the image when needed (for example after an iPad reboot), starts Legacy Display and opens OpenDisplay on the Mac. It does not reinstall or change the receiver. Keep the iPad unlocked; this command cannot bypass its passcode. If the desktop does not reconnect automatically, click **Connect** for that iPad in OpenDisplay.
+
+For a Mac shortcut, add a **Run Shell Script** action in Apple's Shortcuts app and call the launcher with absolute paths and your device's UDID. Shortcuts requires **Settings → Advanced → Allow Running Scripts** to use that action. Alternatively, save the same command in an executable `.command` file and double-click it in Finder. Keep device-specific launchers local; do not commit your UDID or signing files.
+
 ## iPad mini 2 resolution settings (arm64 Build 7 and later)
 
 **Hold anywhere on the iPad image for one second** to open **Display Settings**. This also works when no desktop image is arriving. The page lists both groups of resolutions; a checkmark identifies the saved selection in each group. Tap a resolution row directly, scroll down for Video Quality, and tap **Done** to return to the display.
